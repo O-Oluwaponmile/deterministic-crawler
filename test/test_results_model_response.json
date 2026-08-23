@@ -1,0 +1,1 @@
+{"fixture_model_output_violation.html": ["Actual outcome: BLOCKED_OUTPUT_INTEGRITY_VIOLATION", "Expected: BLOCKED_OUTPUT_INTEGRITY_VIOLATION", "PASS"], "fixture_model_output_none.html": ["Actual outcome(None): SKIPPED_MODEL_RETURNED_NO_OUTPUT", "Expected(None): SKIPPED_MODEL_RETURNED_NO_OUTPUT", "PASS"]}
