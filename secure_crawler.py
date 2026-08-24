@@ -158,7 +158,7 @@ def clean_page(raw_html: str) -> str:
     Returns:
         str: The content with comments and tags removed, whitespace-trimmed.
     """
-    a = re.sub(r"<!--.*?-->", "", raw_html, flags=re.DOTALL)
+    a = re.sub(r"<!--.*?-->", "", raw_html, flags=re.RegexFlag.DOTALL)
     b = re.sub(r"<[^>]+>", " ", a)
     return b.strip()
 
@@ -336,6 +336,42 @@ def validate_output_integrity(response_text: str):
         return is_valid, response_text
 
 
+def build_prompt(content: str) -> str:
+    family, pattern = INJECTION_PATTERNS[0]
+
+    subbed = re.sub(
+        pattern, " ", content, flags=re.RegexFlag.DOTALL | re.RegexFlag.IGNORECASE
+    )
+
+    prompt = (
+        f"Summarize this page <untrusted_content>{subbed.strip()}</untrusted_content>"
+    )
+
+    open_del_escape = re.findall(
+        r"(?:<|&lt;)\s*(?:untrusted_content)\s*(?:>|&gt;)",
+        prompt,
+        flags=re.RegexFlag.IGNORECASE,
+    )
+
+    close_del_escape = re.findall(
+        r"(?:</|&lt;/)\s*(?:untrusted_content)\s*(?:>|&gt;)",
+        prompt,
+        flags=re.RegexFlag.IGNORECASE,
+    )
+
+    assert len(open_del_escape) == 1, (
+        f"Prompt includes more than one open delimeter escape {open_del_escape} count: {len(open_del_escape)}"
+    )
+
+    assert len(close_del_escape) == 1, (
+        f"Prompt includes more than one open delimeter escape {close_del_escape} count: {len(close_del_escape)}"
+    )
+
+    assert prompt.endswith("</untrusted_content>")
+
+    return prompt
+
+
 def secure_summarize(
     source: str, strict_mode: bool = True
 ) -> tuple[Enum, str | list[str]]:
@@ -397,7 +433,7 @@ def secure_summarize(
         if is_safe:
             cleaned_page = clean_page(raw_html)
 
-            prompt = f"Summarize this page <untrusted_content>{cleaned_page}</untrusted_content>"
+            prompt = build_prompt(cleaned_page)
             response = secure_agent.models.generate_content(
                 model="gemini-3.5-flash",
                 contents=prompt,
@@ -437,7 +473,7 @@ def secure_summarize(
                         is_valid,
                         SummarizeOutcome.PASSED.value,
                         [t for r, rc, t in findings],
-                        [],
+                        None,
                         hashlib.sha256(raw_html.encode("utf-8")).hexdigest(),
                     )
                     return (
@@ -503,7 +539,7 @@ def secure_summarize(
 
             else:
                 cleaned_page = clean_page(raw_html)
-                prompt = f"Summarize this page <untrusted_content>{cleaned_page}</untrusted_content>"
+                prompt = build_prompt(cleaned_page)
                 response = secure_agent.models.generate_content(
                     model="gemini-3.5-flash",
                     contents=prompt,
@@ -542,7 +578,7 @@ def secure_summarize(
                             is_valid,
                             SummarizeOutcome.PASSED_SANITIZED.value,
                             [t for r, rc, t in findings],
-                            [],
+                            None,
                             hashlib.sha256(raw_html.encode("utf-8")).hexdigest(),
                         )
                         return (
