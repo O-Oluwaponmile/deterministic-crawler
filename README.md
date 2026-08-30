@@ -53,15 +53,32 @@ Logging matched literals would leak the pattern list to anyone with log access, 
 
 ## Four bugs I found building this
 
-Full write-ups, with the exploit and the fix for each, are in [THREAT_MODEL.md](THREAT_MODEL.md).
+Full write-ups, with the exploit and the fix for each, are in [THREAT_MODEL.md](THREAT_MODEL.md). Mapped against the **OWASP Top 10 for LLM Applications 2025 (v2.0)** and **MITRE CWE Standards**.
 
-**[The sanitizer was hiding payloads from the scanner.](THREAT_MODEL.md#1-the-sanitizer-was-hiding-payloads-from-the-scanner)** The original code scanned raw HTML and cleaned the page *after* the check, so `Ignore all <b>previous</b> instructions` passed unscanned and was reassembled into a working instruction afterwards. Telemetry recorded `PASSED` with zero findings — a false negative logged as positive assurance, which is worse than running no scan at all. Both representations are now scanned, and reach is derived by comparing them.
+| Defect & Defensive Boundary | Industry Vulnerability Standard | Primary CWE |
+|---|---|---|
+| **1. Sanitizer Hiding Payloads from Scanner** | [OWASP LLM01: Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) (Indirect Prompt Injection) | [CWE-180: Validate Before Canonicalize](https://cwe.mitre.org/data/definitions/180.html) |
+| **2. Delimiter Forgery / Enclosure Escape** | [OWASP LLM01: Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) (Delimiter Hijacking) | [CWE-116: Improper Encoding or Escaping of Output](https://cwe.mitre.org/data/definitions/116.html) |
+| **3. Unaudited Model Output Return Path** | [OWASP LLM05: Improper Output Handling](https://genai.owasp.org/llmrisk/llm05-improper-output-handling/) | [CWE-20: Improper Input Validation](https://cwe.mitre.org/data/definitions/20.html) *(at return boundary)* |
+| **4. Cross-Representation Keying & Shadowed Grammars** | [OWASP LLM01: Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) (Scanner Logic Defect) | *No clean 1:1 mapping* (Closest: [CWE-697](https://cwe.mitre.org/data/definitions/697.html) / [CWE-184](https://cwe.mitre.org/data/definitions/184.html)) |
 
-**[The denylist watched everyone's boundary except its own.](THREAT_MODEL.md#2-the-denylist-watched-everyones-boundary-except-its-own)** The design named `<untrusted_content>` as its only enforced isolation, and the pattern list contained nothing matching an attempt to forge or close it — every literal was generic jailbreak phrasing borrowed from other people's threat models. A page containing a literal `</untrusted_content>` ends the quarantine early with one string and no obfuscation. `delimiter_escape` is now a first-class family, in both raw and HTML-entity encodings.
+---
 
-**[The model's output was an unaudited return path.](THREAT_MODEL.md#3-the-models-output-was-an-unaudited-return-path)** Input gating alone assumes a payload can only manifest on the way in, so a model that *did* comply returned its compromised text to the caller unexamined. `validate_output_integrity()` now scans the response before it is returned and withholds it on a match. Family matching detects string presence, not semantic role — the accepted limit is recorded in `ADR.md`, ADR-003.
+**[The sanitizer was hiding payloads from the scanner.](THREAT_MODEL.md#1-the-sanitizer-was-hiding-payloads-from-the-scanner)**  
+*Standards Alignment*: [OWASP LLM01 (Indirect Prompt Injection)](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) · [CWE-180 (Validate Before Canonicalize)](https://cwe.mitre.org/data/definitions/180.html)  
+The original code scanned raw HTML and cleaned the page *after* the check, so `Ignore all <b>previous</b> instructions` passed unscanned and was reassembled into a working instruction afterwards. Telemetry recorded `PASSED` with zero findings — a false negative logged as positive assurance, which is worse than running no scan at all. Both representations are now scanned, and reach is derived by comparing them.
 
-**[Keying findings on matched text misclassified reach.](THREAT_MODEL.md#4-keying-findings-on-matched-text-misclassified-reach)** Because cleaning double-spaces payloads, comparing matched text across the two passes reported one payload as two single-pass findings — so content that *did* reach the model classified as `raw_only`, which is the classification permissive mode uses to let it through. Findings now key on family ID, stable across representations by construction. The same root cause had also shadowed three plural literals inside their singular forms, which is what replaced 14 hand-enumerated strings with 5 named families.
+**[The denylist watched everyone's boundary except its own.](THREAT_MODEL.md#2-the-denylist-watched-everyones-boundary-except-its-own)**  
+*Standards Alignment*: [OWASP LLM01 (Delimiter Hijacking)](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) · [CWE-116 (Improper Escaping)](https://cwe.mitre.org/data/definitions/116.html)  
+The design named `<untrusted_content>` as its only enforced isolation, and the pattern list contained nothing matching an attempt to forge or close it — every literal was generic jailbreak phrasing borrowed from other people's threat models. A page containing a literal `</untrusted_content>` ends the quarantine early with one string and no obfuscation. `delimiter_escape` is now a first-class family, in both raw and HTML-entity encodings.
+
+**[The model's output was an unaudited return path.](THREAT_MODEL.md#3-the-models-output-was-an-unaudited-return-path)**  
+*Standards Alignment*: [OWASP LLM05 (Improper Output Handling)](https://genai.owasp.org/llmrisk/llm05-improper-output-handling/) · [CWE-20 (Improper Input Validation)](https://cwe.mitre.org/data/definitions/20.html)  
+Input gating alone assumes a payload can only manifest on the way in, so a model that *did* comply returned its compromised text to the caller unexamined. `validate_output_integrity()` now scans the response before it is returned and withholds it on a match. Family matching detects string presence, not semantic role — the accepted limit is recorded in `ADR.md`, ADR-003.
+
+**[Keying findings on matched text misclassified reach.](THREAT_MODEL.md#4-keying-findings-on-matched-text-misclassified-reach)**  
+*Standards Alignment*: [OWASP LLM01 (Scanner Logic Defect)](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) · *No clean 1:1 CWE mapping* (Closest: [CWE-697](https://cwe.mitre.org/data/definitions/697.html) / [CWE-184](https://cwe.mitre.org/data/definitions/184.html))  
+Because cleaning double-spaces payloads, comparing matched text across the two passes reported one payload as two single-pass findings — so content that *did* reach the model classified as `raw_only`, which is the classification permissive mode uses to let it through. Findings now key on family ID, stable across representations by construction. The same root cause had also shadowed three plural literals inside their singular forms, which is what replaced 14 hand-enumerated strings with 5 named families.
 
 ## The two layers
 
