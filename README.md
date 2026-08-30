@@ -1,5 +1,7 @@
 # secure-crawler
 
+> **Live Telemetry & Audit Trail**: [https://lab.renderstudio.dev/secure-crawler](https://lab.renderstudio.dev/secure-crawler) — Interactive telemetry viewer for all 24 gate decisions, payload SHA-256 hashes, and policy comparison.
+
 An LLM asked to summarize a web page will also follow instructions hidden inside that page. Nothing in an ordinary fetch-and-summarize pipeline notices, which means any page it crawls can rewrite what the agent does next.
 
 `secure-crawler` treats every fetched page as hostile input: a two-pass scanner before the model, delimiter isolation at the prompt, an integrity check on the model's response, and a log line for every policy decision.
