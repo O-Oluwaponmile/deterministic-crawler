@@ -1,4 +1,18 @@
-"""This module fetches a webpage's content via a valid https only url and parses it cleanly for scanning against KNOWN injection patterns. The result of the scan is used to enforce a policy decision that determines what reaches the model, and what output is permissible. The crawler is invoked with developer-supplied resources and does not yet account for an external caller's input -this is out of scope for this build, see future work. The policy enforcement is not a deterministic security layer and does not account for cases where inputs are not normalized, paraphrased or in special characters outside of the known patterns. The only structural isolation happens with the delimiter tag `<untrusted_content>` and does not restrict the model from processing crawled content as raw text. The main function `secure_summarize` returns a Policy Decision as an Enum, and a message backing up the decision. Telemetry is logged for the branch the system goes through when called."""
+"""secure_crawler.py — Prompt Injection Defense & Ingestion Gateway
+
+Fetches web content over HTTPS, scans raw and cleaned payloads against known
+injection pattern families, and enforces dual-gate policy decisions before 
+untrusted content can influence the model or emit unverified output.
+
+Interactive Audit Trail & Telemetry:
+    https://lab.renderstudio.dev/secure-crawler
+
+Boundaries & Known Limits:
+    - Structural isolation relies on `<untrusted_content>` tags.
+    - Pattern matching is not a deterministic security layer; unnormalized,
+      paraphrased, or novel encoding variants are out of scope for this build.
+    - Output validation checks for integrity overrides, not semantic truth.
+"""
 
 import hashlib
 import json
