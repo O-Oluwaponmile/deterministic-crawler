@@ -1,10 +1,10 @@
-# secure-crawler
+# deterministic-crawler
 
-> **Live Telemetry & Audit Trail**: [https://lab.renderstudio.dev/secure-crawler](https://lab.renderstudio.dev/secure-crawler) — Interactive telemetry viewer for all 24 gate decisions, payload SHA-256 hashes, and policy comparison.
+> **Live Telemetry & Audit Trail**: [https://lab.renderstudio.dev/telemetry](https://lab.renderstudio.dev/telemetry) — Interactive telemetry viewer for all 24 gate decisions, payload SHA-256 hashes, and policy comparison.
 
 An LLM asked to summarize a web page will also follow instructions hidden inside that page. Nothing in an ordinary fetch-and-summarize pipeline notices, which means any page it crawls can rewrite what the agent does next.
 
-`secure-crawler` treats every fetched page as hostile input: a two-pass scanner before the model, delimiter isolation at the prompt, an integrity check on the model's response, and a log line for every policy decision.
+`deterministic-crawler` treats every fetched page as hostile input: a two-pass scanner before the model, delimiter isolation at the prompt, an integrity check on the model's response, and a log line for every policy decision.
 
 ```mermaid
 flowchart TD
@@ -25,7 +25,7 @@ flowchart TD
 
 ## What it does
 
-`secure_summarize(source, strict_mode=True)` fetches a page over HTTPS, runs an input policy gate before the content reaches the model, and runs an output policy gate on the model's response before returning it. It returns an `(outcome, detail)` pair:
+`deterministic_summarize(source, strict_mode=True)` fetches a page over HTTPS, runs an input policy gate before the content reaches the model, and runs an output policy gate on the model's response before returning it. It returns an `(outcome, detail)` pair:
 
 | Condition | Returns |
 |---|---|
@@ -106,11 +106,11 @@ Stated once, in one place.
 
 **The subject is the content trust boundary — what a fetched page can do to a model.** The `source` argument is developer-supplied: no authentication, no rate limiting, no allowlist, and no SSRF protection beyond the `https://` scheme check. Put this behind a user-facing endpoint as-is and the caller chooses what your server fetches. That is a boundary I drew, not one I missed — the caller-side problem is a separate project on deterministic authorization for privileged model-driven actions. The name is intent, not a guarantee, which is also why the primary enum is `SummarizeOutcome` and not `SecurityResult` (`ADR.md`, ADR-002).
 
-**Not a benchmark.** `python test_secure_crawler.py` passes 12 of 12 assertions across 3 suites, exit code 0, reproduced twice on 2026-08-23 — [full results](THREAT_MODEL.md#test-results). I wrote both the fixtures and the patterns they exercise, so this measures that the policy matrix behaves as specified. It is not a detection rate, there is no independent adversarial corpus behind it, and no compliance figure for Layer B is claimed anywhere. Running it against PortSwigger's Web LLM labs is the next step and has not happened.
+**Not a benchmark.** `python test_deterministic_crawler.py` passes 12 of 12 assertions across 3 suites, exit code 0, reproduced twice on 2026-08-23 — [full results](THREAT_MODEL.md#test-results). I wrote both the fixtures and the patterns they exercise, so this measures that the policy matrix behaves as specified. It is not a detection rate, there is no independent adversarial corpus behind it, and no compliance figure for Layer B is claimed anywhere. Running it against PortSwigger's Web LLM labs is the next step and has not happened.
 
 **Known gaps, in the order I'd close them:**
 
-1. **`InvalidUrlError` is never exercised end-to-end.** The suite mocks `secure_crawler.get_page` in every case, so the `https://`-only enforcement inside `get_page` and the `InvalidUrlError` path in `secure_summarize` never execute under test. Known gap, not settled coverage.
+1. **`InvalidUrlError` is never exercised end-to-end.** The suite mocks `deterministic_crawler.get_page` in every case, so the `https://`-only enforcement inside `get_page` and the `InvalidUrlError` path in `deterministic_summarize` never execute under test. Known gap, not settled coverage.
 2. **`NetworkFetchError`, `ClientError`, and `ServerError` are untested too.** No fixture drives them.
 3. **Content isn't escaped before wrapping.** Stripping or escaping the delimiter from content before wrapping would make forgery structurally impossible instead of merely detected. Both are cheap; I only built detection.
 4. **The delimiter is guessable.** `<untrusted_content>` is a fixed, published string. A randomized per-request suffix would fix that. Not built.
@@ -119,15 +119,15 @@ Stated once, in one place.
 7. **No `policy_version` in telemetry.** Records can't be attributed to the pattern-set revision that produced them, so historical telemetry goes ambiguous the moment the families change.
 8. **`ADR.md` covers three decisions, not the whole design.** The reasoning behind block-both policy, grammar over enumeration, delimiter-as-boundary, family-ID keying, and the precision tuning above lives in these documents and isn't mirrored into ADR form.
 
-**Deliberately out of scope:** caller-side input validation (see above) · character-level normalization, the third representation needed to defeat intra-word splitting · semantic intent analysis (`ADR.md`, ADR-003) · raw-text input, since `secure_summarize` takes a URL and never a string (`ADR.md`, ADR-001, rejected) · automated adversarial generation, which belongs to a red-team harness aimed at these defenses rather than to this repo.
+**Deliberately out of scope:** caller-side input validation (see above) · character-level normalization, the third representation needed to defeat intra-word splitting · semantic intent analysis (`ADR.md`, ADR-003) · raw-text input, since `deterministic_summarize` takes a URL and never a string (`ADR.md`, ADR-001, rejected) · automated adversarial generation, which belongs to a red-team harness aimed at these defenses rather than to this repo.
 
 ## Quickstart
 
 Requires `requests` and `google-genai`. Built and tested on Python 3.14.7 with `requests` 2.34.2; the floor is 3.10+ for PEP 604 `X | None` annotations, and nothing between 3.10 and 3.14 has been tested.
 
 ```bash
-git clone https://github.com/O-Oluwaponmile/secure-crawler.git
-cd secure-crawler
+git clone https://github.com/O-Oluwaponmile/deterministic-crawler.git
+cd deterministic-crawler
 ```
 
 Put a Gemini API key in a `.env` one directory above the module (see `get_env()`):
@@ -137,13 +137,13 @@ GEMINI_API_KEY=your_key_here
 ```
 
 ```python
-from secure_crawler import secure_summarize
+from deterministic_crawler import deterministic_summarize
 
-outcome, detail = secure_summarize("https://example.com")            # strict (default)
-outcome, detail = secure_summarize("https://example.com", strict_mode=False)
+outcome, detail = deterministic_summarize("https://example.com")            # strict (default)
+outcome, detail = deterministic_summarize("https://example.com", strict_mode=False)
 ```
 
-Run the fixtures with `python test_secure_crawler.py`.
+Run the fixtures with `python test_deterministic_crawler.py`.
 
 ## Related
 

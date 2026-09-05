@@ -10,7 +10,7 @@ Terminology used throughout: **Layer A** is `scan_threats()`, a monitoring layer
 
 **Standards Alignment:** [OWASP LLM01 (Indirect Prompt Injection)](https://genai.owasp.org/llmrisk/llm01-prompt-injection/) · [CWE-180 (Validate Before Canonicalize)](https://cwe.mitre.org/data/definitions/180.html)
 
-**The defect.** `secure_summarize()` scanned only `raw_html`, and cleaned the page *after* the safety check, inside the `is_safe` branch. Any payload whose signature only becomes visible after sanitization passed the gate unscanned.
+**The defect.** `deterministic_summarize()` scanned only `raw_html`, and cleaned the page *after* the safety check, inside the `is_safe` branch. Any payload whose signature only becomes visible after sanitization passed the gate unscanned.
 
 **The exploit.** `Ignore all <b>previous</b> instructions` is invisible to a raw scan — the `<b>` splits the phrase mid-signature. Cleaning reassembles it into a working instruction *after* the only check has already run. The attacker needs no knowledge of the pattern list, only the knowledge that a sanitizer exists. Telemetry logs `PASSED` with zero findings: a false negative recorded as positive assurance, which is worse than running no scan at all.
 
@@ -95,7 +95,7 @@ Its run recorded `"output_valid": true`, meaning the response contained no known
 
 ## Test results
 
-`python test_secure_crawler.py` on 2026-08-23, exit code 0. **12 assertions across 3 suites, 12 pass.** Re-run the same day at 13:21 and 14:21 UTC with identical outcomes on all 12. Both runs are appended to the `telemetry.jsonl` committed here; full artifacts are in `test/`.
+`python test_deterministic_crawler.py` on 2026-08-23, exit code 0. **12 assertions across 3 suites, 12 pass.** Re-run the same day at 13:21 and 14:21 UTC with identical outcomes on all 12. Both runs are appended to the `telemetry.jsonl` committed here; full artifacts are in `test/`.
 
 ### `strict_mode=True`
 
